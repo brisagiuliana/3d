@@ -82,9 +82,17 @@
     </header>
     <main>
         <div id="controls-card">
-            <h2>1. Upload Image</h2>
-            <p>Select a JPG or PNG image to convert into a 3D model.</p>
-            <input type="file" id="image-upload" accept="image/jpeg, image/png">
+            <h2>1. Configure & Upload</h2>
+            <p>Select an image and choose your generation settings.</p>
+            <div>
+                <label for="image-upload">Image File:</label>
+                <input type="file" id="image-upload" accept="image/jpeg, image/png">
+            </div>
+            <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
+                <input type="checkbox" id="use-normal-map" name="use-normal-map" checked>
+                <label for="use-normal-map">Enable Advanced Textures (Normal Map)</label>
+                <p style="font-size: 0.8rem; color: #666;">Adds more realistic surface detail to the model. Requires slightly more processing time.</p>
+            </div>
         </div>
 
         <div id="output-card">
@@ -126,8 +134,8 @@
                 const formData = new FormData();
                 formData.append('file', file);
 
-                // Note: If you add a scale input in the HTML, you can append it here.
-                // For example: formData.append('scale', document.getElementById('scale-input').value);
+                const useNormalMap = document.getElementById('use-normal-map').checked;
+                formData.append('use_normal_map', useNormalMap);
 
                 try {
                     const response = await fetch('/generate', {
