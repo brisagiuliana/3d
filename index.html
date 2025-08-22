@@ -5,9 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Papiweb - Image to 3D Converter</title>
 
-    <!-- Import the <model-viewer> component -->
-    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@latest/dist/tf-backend-webgl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@latest/dist/tf-converter.min.js"></script>
+
+    <!-- Import Map for three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+    }
+    </script>
 
     <style>
         body {
@@ -101,69 +112,10 @@
             <div id="loading-indicator" style="display:none;">
                 <p>⚙️ Generating model, this may take a minute...</p>
             </div>
-            <model-viewer id="viewer"
-                          src=""
-                          alt="3D model preview will appear here"
-                          ar
-                          camera-controls
-                          auto-rotate
-                          style="display:none;">
-            </model-viewer>
+            <canvas id="renderer-canvas" style="display:none; width: 100%; height: 500px;"></canvas>
         </div>
     </main>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const uploadInput = document.getElementById('image-upload');
-            const generateBtn = document.getElementById('generate-btn');
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const viewer = document.getElementById('viewer');
-
-            generateBtn.addEventListener('click', async () => {
-                const file = uploadInput.files[0];
-                if (!file) {
-                    alert('Please select an image file first.');
-                    return;
-                }
-
-                // Show loading indicator and hide viewer
-                loadingIndicator.style.display = 'block';
-                viewer.style.display = 'none';
-                viewer.src = ""; // Clear previous model
-
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const useNormalMap = document.getElementById('use-normal-map').checked;
-                formData.append('use_normal_map', useNormalMap);
-
-                try {
-                    const response = await fetch('/generate', {
-                        method: 'POST',
-                        body: formData,
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        // Preload the model and then show the viewer
-                        viewer.addEventListener('load', () => {
-                            loadingIndicator.style.display = 'none';
-                            viewer.style.display = 'block';
-                        }, { once: true });
-
-                        viewer.src = result.model_url;
-                    } else {
-                        alert(`Error: ${result.error}`);
-                        loadingIndicator.style.display = 'none';
-                    }
-                } catch (error) {
-                    console.error('An error occurred:', error);
-                    alert('An unexpected error occurred. Please check the server logs.');
-                    loadingIndicator.style.display = 'none';
-                }
-            });
-        });
-    </script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
