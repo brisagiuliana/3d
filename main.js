@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- Constants and Globals ---
-const MODEL_URL = 'https://timmh.github.io/monocular_depth_estimation_demo/midas_u8/model.json';
-let depthModel = null;
+const MODEL_URL = 'https://github.com/isl-org/MiDaS/releases/download/v2_1/model_opt.tflite';
+let tfliteModel = null;
 let scene, camera, renderer, controls;
 let currentMesh = null;
 
@@ -20,24 +20,19 @@ document.body.appendChild(imagePreview);
 function initThree() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xeeeeee);
-
     const aspectRatio = canvas.clientWidth / canvas.clientHeight || 1;
     camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.1, 1000);
-    camera.position.z = 500; // Start further back
-
+    camera.position.z = 500;
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(canvas.parentElement.clientWidth, 500);
     renderer.setPixelRatio(window.devicePixelRatio);
-
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
-
     animate();
 }
 
@@ -49,37 +44,51 @@ function animate() {
 
 // --- AI & Core Logic ---
 async function loadModel() {
-    console.log('Loading model...');
+    console.log('Loading TFLite model...');
     loadingIndicator.innerText = 'Loading AI Model...';
     loadingIndicator.style.display = 'block';
     try {
-        depthModel = await tf.loadGraphModel(MODEL_URL);
+        // Ensure tflite is loaded
+        if (typeof tflite === 'undefined') {
+            throw new Error('TFLite library not loaded. Please check the script tag.');
+        }
+        tfliteModel = await tflite.loadTFLiteModel(MODEL_URL);
         console.log('Model loaded successfully.');
         loadingIndicator.innerText = 'Model loaded. Ready to generate.';
     } catch (e) {
         console.error('Failed to load model:', e);
         alert('Failed to load the AI model. Please check the console for details.');
+        loadingIndicator.innerText = 'Model failed to load.';
     }
 }
 
 async function estimateDepth(imgElement) {
-    if (!depthModel) {
+    if (!tfliteModel) {
         alert('Model is not loaded yet.');
         return null;
     }
-    console.log('Estimating depth...');
+    console.log('Estimating depth with TFLite model...');
     loadingIndicator.innerText = 'Estimating depth...';
     loadingIndicator.style.display = 'block';
 
     const tensor = tf.tidy(() => {
         let input = tf.browser.fromPixels(imgElement);
-        input = tf.image.resizeBilinear(input, [256, 256]);
-        input = tf.div(input, 255);
-        input = tf.transpose(input, [2, 0, 1]);
-        input = tf.expandDims(input);
-        let output = depthModel.execute(input);
+        // TFLite model expects input of size 256x256
+        const resized = tf.image.resizeBilinear(input, [256, 256]);
+        // Normalize to [0,1]
+        const normalized = resized.div(255.0);
+        // Add batch dimension
+        const batched = normalized.expandDims(0);
+
+        // Run inference
+        let output = tfliteModel.predict(batched);
+
+        // Post-process the output
         output = tf.squeeze(output);
-        output = tf.div(tf.sub(output, tf.min(output)), tf.sub(tf.max(output), tf.min(output)));
+        output = tf.div(
+            tf.sub(output, tf.min(output)),
+            tf.sub(tf.max(output), tf.min(output))
+        );
         return output;
     });
 
@@ -88,12 +97,6 @@ async function estimateDepth(imgElement) {
     return tensor;
 }
 
-/**
- * Creates a 3D mesh from a depth map tensor and a texture image.
- * @param {tf.Tensor} depthMapTensor The depth map.
- * @param {HTMLImageElement} textureImage The image to use as a texture.
- * @returns {THREE.Mesh} The generated 3D mesh.
- */
 async function createMeshFromDepthMap(depthMapTensor, textureImage) {
     const depthMap = await depthMapTensor.array();
     const [height, width] = depthMapTensor.shape;
@@ -106,7 +109,7 @@ async function createMeshFromDepthMap(depthMapTensor, textureImage) {
         const x = Math.round(i % width);
         const y = Math.floor(i / width);
         const depth = depthMap[y][x];
-        positionAttribute.setZ(i, depth * extrusionScale);
+        positionAttribute.setZ(i, (1.0 - depth) * extrusionScale); // Invert depth
     }
     geometry.computeVertexNormals();
 
@@ -119,9 +122,7 @@ async function createMeshFromDepthMap(depthMapTensor, textureImage) {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    // Orient the mesh so it faces the camera
     mesh.rotation.x = -Math.PI / 2;
-
     return mesh;
 }
 
@@ -149,7 +150,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMesh.material.dispose();
                     }
 
+                    const originalWidth = imagePreview.naturalWidth;
+                    const originalHeight = imagePreview.naturalHeight;
+
                     currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
+
+                    // Scale mesh to maintain aspect ratio
+                    currentMesh.scale.set(originalWidth, originalHeight, 1);
+                    camera.position.z = Math.max(originalWidth, originalHeight) * 1.5;
+
                     scene.add(currentMesh);
                     canvas.style.display = 'block';
 
