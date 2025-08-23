@@ -48,10 +48,6 @@ async function loadModel() {
     loadingIndicator.innerText = 'Loading AI Model...';
     loadingIndicator.style.display = 'block';
     try {
-        // Ensure tflite is loaded
-        if (typeof tflite === 'undefined') {
-            throw new Error('TFLite library not loaded. Please check the script tag.');
-        }
         tfliteModel = await tflite.loadTFLiteModel(MODEL_URL);
         console.log('Model loaded successfully.');
         loadingIndicator.innerText = 'Model loaded. Ready to generate.';
@@ -79,7 +75,7 @@ async function estimateDepth(imgElement) {
         const normalized = resized.div(255.0);
         // Add batch dimension
         const batched = normalized.expandDims(0);
-
+        
         // Run inference
         let output = tfliteModel.predict(batched);
 
@@ -129,7 +125,17 @@ async function createMeshFromDepthMap(depthMapTensor, textureImage) {
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
     initThree();
-    loadModel();
+    
+    // Poll until the tflite library is ready
+    function waitForTFLite() {
+        if (typeof tflite !== 'undefined') {
+            loadModel();
+        } else {
+            console.log('TFLite library not ready, waiting...');
+            setTimeout(waitForTFLite, 100);
+        }
+    }
+    waitForTFLite();
 
     generateBtn.addEventListener('click', () => {
         const file = uploadInput.files[0];
@@ -149,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMesh.geometry.dispose();
                         currentMesh.material.dispose();
                     }
-
+                    
                     const originalWidth = imagePreview.naturalWidth;
                     const originalHeight = imagePreview.naturalHeight;
 
                     currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
-
+                    
                     // Scale mesh to maintain aspect ratio
                     currentMesh.scale.set(originalWidth, originalHeight, 1);
                     camera.position.z = Math.max(originalWidth, originalHeight) * 1.5;
