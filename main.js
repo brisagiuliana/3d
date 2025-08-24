@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- Constants and Globals ---
-const MODEL_URL = './assets/midas.tflite';
+const MODEL_URL = 'https://github.com/isl-org/MiDaS/releases/download/v2_1/model_opt.tflite';
 let tfliteModel = null;
 let scene, camera, renderer, controls;
 let currentMesh = null;
@@ -33,7 +33,16 @@ function initThree() {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
+
+    window.addEventListener('resize', onWindowResize, false);
+
     animate();
+}
+
+function onWindowResize() {
+    camera.aspect = canvas.parentElement.clientWidth / 500;
+    camera.updateProjectionMatrix();
+    renderer.setSize(canvas.parentElement.clientWidth, 500);
 }
 
 function animate() {
@@ -75,7 +84,7 @@ async function estimateDepth(imgElement) {
         const normalized = resized.div(255.0);
         // Add batch dimension
         const batched = normalized.expandDims(0);
-        
+
         // Run inference
         let output = tfliteModel.predict(batched);
 
@@ -125,7 +134,7 @@ async function createMeshFromDepthMap(depthMapTensor, textureImage) {
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
     initThree();
-    
+
     // Poll until the tflite library is ready
     function waitForTFLite() {
         if (typeof tflite !== 'undefined') {
@@ -155,15 +164,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMesh.geometry.dispose();
                         currentMesh.material.dispose();
                     }
-                    
-                    const originalWidth = imagePreview.naturalWidth;
-                    const originalHeight = imagePreview.naturalHeight;
 
                     currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
-                    
-                    // Scale mesh to maintain aspect ratio
-                    currentMesh.scale.set(originalWidth, originalHeight, 1);
-                    camera.position.z = Math.max(originalWidth, originalHeight) * 1.5;
+
+                    // The geometry is already created with the correct aspect ratio (256x256).
+                    // We don't need to scale it further.
+                    // Let's center the camera and set a reasonable distance.
+                    const boundingBox = new THREE.Box3().setFromObject(currentMesh);
+                    const center = boundingBox.getCenter(new THREE.Vector3());
+                    const size = boundingBox.getSize(new THREE.Vector3());
+
+                    controls.target.copy(center);
+                    camera.position.z = Math.max(size.x, size.y, size.z) * 1.5;
+                    camera.lookAt(center);
 
                     scene.add(currentMesh);
                     canvas.style.display = 'block';
