@@ -164,9 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMesh.geometry.dispose();
                         currentMesh.material.dispose();
                     }
-
                     currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
-
                     // The geometry is already created with the correct aspect ratio (256x256).
                     // We don't need to scale it further.
                     // Let's center the camera and set a reasonable distance.
