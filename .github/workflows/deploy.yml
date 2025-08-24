@@ -3,22 +3,38 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - feat/image-to-3d-converter  # o la rama que uses para producción
+      - feat/image-to-3d-converter
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v2
-      
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+        
       - name: Combine model files
         run: |
           mkdir -p assets
           cat assets/midas.tflite.part_* > assets/midas.tflite
-      
-      - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@4.1.4
+          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
         with:
-          branch: gh-pages
-          folder: .
-          clean: true
+          path: "."
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
