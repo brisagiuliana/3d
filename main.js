@@ -212,6 +212,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let attempts = 0;
     const maxAttempts = 50; // 5 segundos máximo
 
+    async function loadModel() {
+        try {
+            tfliteModel = await loadTFLiteModel(MODEL_URL);
+            console.log('Modelo cargado exitosamente');
+            return true;
+        } catch (error) {
+            console.error('Error al cargar el modelo:', error);
+            alert('Error al cargar el modelo. Por favor, recarga la página o verifica tu conexión a internet.');
+            return false;
+        }
+    }
+
     function waitForTFLite() {
         if (typeof tflite !== 'undefined') {
             console.log('TFLite detectado, iniciando carga del modelo...');
