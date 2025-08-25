@@ -324,6 +324,61 @@ document.addEventListener('DOMContentLoaded', () => {
         baseValue.textContent = `${baseSlider.value}%`;
     }
 
+    let regenerateTimeout;
+    function regenerateModel() {
+        // Cancelar regeneración previa si existe
+        if (regenerateTimeout) {
+            clearTimeout(regenerateTimeout);
+        }
+        
+        // Programar nueva regeneración con un pequeño retraso
+        regenerateTimeout = setTimeout(async () => {
+            if (currentMesh && imagePreview.src) {
+                const depthMapTensor = await estimateDepth(imagePreview);
+                if (depthMapTensor) {
+                    if (currentMesh) {
+                        scene.remove(currentMesh);
+                        currentMesh.geometry.dispose();
+                        currentMesh.material.dispose();
+                    }
+                    currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
+                    scene.add(currentMesh);
+                    depthMapTensor.dispose();
+                }
+            }
+        }, 100);
+    }
+
+    // Agregar event listeners para los controles
+    depthSlider.addEventListener('input', () => {
+        updateDepthValue();
+        regenerateModel();
+    });
+
+    baseSlider.addEventListener('input', () => {
+        updateBaseValue();
+        regenerateModel();
+    });
+
+    // Inicializar valores
+    updateDepthValue();
+    updateBaseValue();
+});
+
+    // Event listeners para los controles de ajuste
+    const depthSlider = document.getElementById('depth-scale');
+    const baseSlider = document.getElementById('base-height');
+    const depthValue = document.getElementById('depth-value');
+    const baseValue = document.getElementById('base-value');
+
+    function updateDepthValue() {
+        depthValue.textContent = `${depthSlider.value}%`;
+    }
+
+    function updateBaseValue() {
+        baseValue.textContent = `${baseSlider.value}%`;
+    }
+
     function regenerateModel() {
         if (currentMesh && imagePreview.src) {
             const reader = new FileReader();
