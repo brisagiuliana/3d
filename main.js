@@ -191,6 +191,42 @@ function downloadGLB() {
     );
 }
 
+// --- Model Loading ---
+let modelLoadAttempts = 0;
+const maxModelLoadAttempts = 50; // 5 segundos máximo
+
+async function loadModel() {
+    try {
+        tfliteModel = await loadTFLiteModel(MODEL_URL);
+        console.log('Modelo cargado exitosamente');
+        return true;
+    } catch (error) {
+        console.error('Error al cargar el modelo:', error);
+        alert('Error al cargar el modelo. Por favor, recarga la página o verifica tu conexión a internet.');
+        return false;
+    }
+}
+
+function waitForTFLite() {
+    if (typeof tflite !== 'undefined') {
+        console.log('TFLite detectado, iniciando carga del modelo...');
+        loadModel().then(success => {
+            if (!success) {
+                console.error('No se pudo cargar ningún modelo');
+            }
+        });
+    } else {
+        modelLoadAttempts++;
+        if (modelLoadAttempts >= maxModelLoadAttempts) {
+            console.error('TFLite no se pudo cargar después de varios intentos');
+            alert('Error: No se pudo inicializar el sistema de IA. Por favor, recargue la página o intente con otro navegador.');
+            return;
+        }
+        console.log(`Esperando que TFLite esté disponible... (intento ${modelLoadAttempts}/${maxModelLoadAttempts})`);
+        setTimeout(waitForTFLite, 100);
+    }
+}
+
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
     // Verificar requisitos del navegador
@@ -208,41 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar Three.js
     initThree();
 
-    // Verificar y cargar TFLite
-    let attempts = 0;
-    const maxAttempts = 50; // 5 segundos máximo
-
-    async function loadModel() {
-        try {
-            tfliteModel = await loadTFLiteModel(MODEL_URL);
-            console.log('Modelo cargado exitosamente');
-            return true;
-        } catch (error) {
-            console.error('Error al cargar el modelo:', error);
-            alert('Error al cargar el modelo. Por favor, recarga la página o verifica tu conexión a internet.');
-            return false;
-        }
-    }
-
-    function waitForTFLite() {
-        if (typeof tflite !== 'undefined') {
-            console.log('TFLite detectado, iniciando carga del modelo...');
-            loadModel().then(success => {
-                if (!success) {
-                    console.error('No se pudo cargar ningún modelo');
-                }
-            });
-        } else {
-            attempts++;
-            if (attempts >= maxAttempts) {
-                console.error('TFLite no se pudo cargar después de varios intentos');
-                alert('Error: No se pudo inicializar el sistema de IA. Por favor, recargue la página o intente con otro navegador.');
-                return;
-            }
-            console.log(`Esperando que TFLite esté disponible... (intento ${attempts}/${maxAttempts})`);
-            setTimeout(waitForTFLite, 100);
-        }
-    }
+    // Iniciar carga del modelo
     waitForTFLite();
 
     generateBtn.addEventListener('click', () => {
