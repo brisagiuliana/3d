@@ -4,8 +4,8 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
 // --- Constants and Globals ---
 const MODELS = {
-    default: 'https://raw.githubusercontent.com/brisagiuliana/3d/feat/image-to-3d-converter/assets/models/model_opt.tflite',
-    fallback: 'https://tfhub.dev/tensorflow/lite-model/midas/v2_1_small/1/default/1?lite-format=tflite'
+    default: './assets/models/model_opt.tflite',
+    fallback: 'https://raw.githubusercontent.com/brisagiuliana/3d/main/assets/models/model_opt.tflite'
 };
 let MODEL_URL = MODELS.default;
 let tfliteModel = null;
@@ -71,10 +71,37 @@ async function loadTFLiteModel(modelUrl) {
     let attempts = 0;
     const maxAttempts = 3;
 
+    // Función auxiliar para verificar si el archivo existe y es accesible
+    async function checkModelFile(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            // Verificar que el archivo tiene contenido
+            const buffer = await response.arrayBuffer();
+            if (buffer.byteLength === 0) {
+                throw new Error('El archivo del modelo está vacío');
+            }
+            return buffer;
+        } catch (error) {
+            console.error('Error al verificar el modelo:', error);
+            return null;
+        }
+    }
+
     while (attempts < maxAttempts) {
         try {
             console.log(`Intento ${attempts + 1} de cargar el modelo desde: ${modelUrl}`);
-            const tfliteModel = await tflite.loadTFLiteModel(modelUrl);
+            
+            // Primero verificar si podemos acceder al archivo
+            const modelBuffer = await checkModelFile(modelUrl);
+            if (!modelBuffer) {
+                throw new Error('No se pudo acceder al archivo del modelo');
+            }
+
+            // Intentar cargar el modelo desde el buffer
+            const tfliteModel = await tflite.loadTFLiteModel(modelBuffer);
             console.log('Modelo TFLite cargado correctamente');
             return tfliteModel;
         } catch (error) {
@@ -85,11 +112,11 @@ async function loadTFLiteModel(modelUrl) {
                 console.log('Intentando cargar modelo alternativo...');
                 return loadTFLiteModel(MODELS.fallback);
             } else if (attempts === maxAttempts) {
-                throw new Error('No se pudo cargar el modelo después de múltiples intentos. Por favor, verifique su conexión a internet y recargue la página.');
+                throw new Error('No se pudo cargar el modelo después de múltiples intentos. Por favor, verifique que el modelo existe y es accesible.');
             }
             
             // Esperar antes del siguiente intento
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
 }
