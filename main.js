@@ -5,7 +5,7 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 // --- Constants and Globals ---
 const MODELS = {
     default: './assets/models/model_opt.tflite',
-    fallback: 'https://raw.githubusercontent.com/brisagiuliana/3d/main/assets/models/model_opt.tflite'
+    fallback: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite'
 };
 let MODEL_URL = MODELS.default;
 let tfliteModel = null;
@@ -67,57 +67,57 @@ function animate() {
 }
 
 // --- AI & Core Logic ---
-async function loadTFLiteModel(modelUrl) {
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    // Función auxiliar para verificar si el archivo existe y es accesible
-    async function checkModelFile(url) {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            // Verificar que el archivo tiene contenido
-            const buffer = await response.arrayBuffer();
-            if (buffer.byteLength === 0) {
-                throw new Error('El archivo del modelo está vacío');
-            }
-            return buffer;
-        } catch (error) {
-            console.error('Error al verificar el modelo:', error);
-            return null;
+async function loadModel() {
+    console.log('Iniciando verificación de modelos disponibles...');
+    loadingIndicator.innerText = 'Inicializando sistema de IA...';
+    loadingIndicator.style.display = 'block';
+    
+    try {
+        // Verificar si el modelo principal está disponible
+        const mainModelExists = await checkFileExists(MODELS.default);
+        console.log('Modelo principal disponible:', mainModelExists);
+        
+        if (!mainModelExists) {
+            console.log('Cambiando a modelo alternativo...');
+            MODEL_URL = MODELS.fallback;
         }
-    }
-
-    while (attempts < maxAttempts) {
-        try {
-            console.log(`Intento ${attempts + 1} de cargar el modelo desde: ${modelUrl}`);
-            
-            // Primero verificar si podemos acceder al archivo
-            const modelBuffer = await checkModelFile(modelUrl);
-            if (!modelBuffer) {
-                throw new Error('No se pudo acceder al archivo del modelo');
-            }
-
-            // Intentar cargar el modelo desde el buffer
-            const tfliteModel = await tflite.loadTFLiteModel(modelBuffer);
-            console.log('Modelo TFLite cargado correctamente');
-            return tfliteModel;
-        } catch (error) {
-            attempts++;
-            console.error(`Error en intento ${attempts}:`, error);
-            
-            if (attempts === maxAttempts && modelUrl === MODELS.default) {
-                console.log('Intentando cargar modelo alternativo...');
-                return loadTFLiteModel(MODELS.fallback);
-            } else if (attempts === maxAttempts) {
-                throw new Error('No se pudo cargar el modelo después de múltiples intentos. Por favor, verifique que el modelo existe y es accesible.');
-            }
-            
-            // Esperar antes del siguiente intento
-            await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Intentar cargar el modelo seleccionado
+        console.log('Iniciando carga del modelo desde:', MODEL_URL);
+        
+        // Intentar la carga con timeout
+        const modelLoadPromise = tflite.loadTFLiteModel(MODEL_URL);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout loading model')), 30000));
+        
+        tfliteModel = await Promise.race([modelLoadPromise, timeoutPromise]);
+        
+        if (tfliteModel) {
+            console.log('Modelo cargado exitosamente:', {
+                modelUrl: MODEL_URL,
+                modelType: MODEL_URL === MODELS.default ? 'Principal' : 'Alternativo'
+            });
+            loadingIndicator.innerText = 'Modelo listo. Puede comenzar a generar.';
+            return true;
         }
+    } catch (e) {
+        console.error('Error detallado al cargar el modelo:', {
+            message: e.message,
+            stack: e.stack,
+            modelUrl: MODEL_URL,
+            browserInfo: navigator.userAgent
+        });
+        
+        // Si falló con el modelo principal, intentar con el alternativo
+        if (MODEL_URL === MODELS.default) {
+            console.log('Intentando con modelo alternativo...');
+            MODEL_URL = MODELS.fallback;
+            return loadModel(); // Recursión para intentar con el modelo alternativo
+        }
+        
+        alert(`Error al cargar el modelo: ${e.message}. Por favor, verifique su conexión a internet.`);
+        loadingIndicator.innerText = 'Error al cargar el modelo. Intente recargar la página.';
+        return false;
     }
 }
 
@@ -153,38 +153,14 @@ async function estimateDepth(imgElement) {
 async function createMeshFromDepthMap(depthMapTensor, textureImage) {
     const depthMap = await depthMapTensor.array();
     const [height, width] = depthMapTensor.shape;
-    
-    // Obtener valores de los controles
-    const depthScale = document.getElementById('depth-scale').value / 100;
-    const baseHeight = document.getElementById('base-height').value / 100;
-    const extrusionScale = 100.0 * depthScale;
-    
+    const extrusionScale = 100.0;
     const geometry = new THREE.PlaneGeometry(width, height, width - 1, height - 1);
     const positionAttribute = geometry.getAttribute('position');
-    
-    // Encontrar el rango de profundidades para normalización
-    let minDepth = 1.0;
-    let maxDepth = 0.0;
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const depth = depthMap[y][x];
-            minDepth = Math.min(minDepth, depth);
-            maxDepth = Math.max(maxDepth, depth);
-        }
-    }
-    
-    // Aplicar la profundidad con base ajustable
     for (let i = 0; i < positionAttribute.count; i++) {
         const y = Math.floor(i / width);
         const depth = depthMap[y][i % width];
-        
-        // Normalizar la profundidad y aplicar el recorte de base
-        const normalizedDepth = (depth - minDepth) / (maxDepth - minDepth);
-        const adjustedDepth = Math.max(normalizedDepth, baseHeight);
-        
-        positionAttribute.setZ(i, (1.0 - adjustedDepth) * extrusionScale);
+        positionAttribute.setZ(i, (1.0 - depth) * extrusionScale);
     }
-    
     geometry.computeVertexNormals();
     const texture = new THREE.Texture(textureImage);
     texture.needsUpdate = true;
@@ -218,42 +194,6 @@ function downloadGLB() {
     );
 }
 
-// --- Model Loading ---
-let modelLoadAttempts = 0;
-const maxModelLoadAttempts = 50; // 5 segundos máximo
-
-async function loadModel() {
-    try {
-        tfliteModel = await loadTFLiteModel(MODEL_URL);
-        console.log('Modelo cargado exitosamente');
-        return true;
-    } catch (error) {
-        console.error('Error al cargar el modelo:', error);
-        alert('Error al cargar el modelo. Por favor, recarga la página o verifica tu conexión a internet.');
-        return false;
-    }
-}
-
-function waitForTFLite() {
-    if (typeof tflite !== 'undefined') {
-        console.log('TFLite detectado, iniciando carga del modelo...');
-        loadModel().then(success => {
-            if (!success) {
-                console.error('No se pudo cargar ningún modelo');
-            }
-        });
-    } else {
-        modelLoadAttempts++;
-        if (modelLoadAttempts >= maxModelLoadAttempts) {
-            console.error('TFLite no se pudo cargar después de varios intentos');
-            alert('Error: No se pudo inicializar el sistema de IA. Por favor, recargue la página o intente con otro navegador.');
-            return;
-        }
-        console.log(`Esperando que TFLite esté disponible... (intento ${modelLoadAttempts}/${maxModelLoadAttempts})`);
-        setTimeout(waitForTFLite, 100);
-    }
-}
-
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
     // Verificar requisitos del navegador
@@ -271,7 +211,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar Three.js
     initThree();
 
-    // Iniciar carga del modelo
+    // Verificar y cargar TFLite
+    let attempts = 0;
+    const maxAttempts = 50; // 5 segundos máximo
+
+    function waitForTFLite() {
+        if (typeof tflite !== 'undefined') {
+            console.log('TFLite detectado, iniciando carga del modelo...');
+            loadModel().then(success => {
+                if (!success) {
+                    console.error('No se pudo cargar ningún modelo');
+                }
+            });
+        } else {
+            attempts++;
+            if (attempts >= maxAttempts) {
+                console.error('TFLite no se pudo cargar después de varios intentos');
+                alert('Error: No se pudo inicializar el sistema de IA. Por favor, recargue la página o intente con otro navegador.');
+                return;
+            }
+            console.log(`Esperando que TFLite esté disponible... (intento ${attempts}/${maxAttempts})`);
+            setTimeout(waitForTFLite, 100);
+        }
+    }
     waitForTFLite();
 
     generateBtn.addEventListener('click', () => {
@@ -309,120 +271,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     downloadBtn.addEventListener('click', downloadGLB);
-
-    // Event listeners para los controles de ajuste
-    const depthSlider = document.getElementById('depth-scale');
-    const baseSlider = document.getElementById('base-height');
-    const depthValue = document.getElementById('depth-value');
-    const baseValue = document.getElementById('base-value');
-
-    function updateDepthValue() {
-        depthValue.textContent = `${depthSlider.value}%`;
-    }
-
-    function updateBaseValue() {
-        baseValue.textContent = `${baseSlider.value}%`;
-    }
-
-    let regenerateTimeout;
-    function regenerateModel() {
-        // Cancelar regeneración previa si existe
-        if (regenerateTimeout) {
-            clearTimeout(regenerateTimeout);
-        }
-        
-        // Programar nueva regeneración con un pequeño retraso
-        regenerateTimeout = setTimeout(async () => {
-            if (currentMesh && imagePreview.src) {
-                const depthMapTensor = await estimateDepth(imagePreview);
-                if (depthMapTensor) {
-                    if (currentMesh) {
-                        scene.remove(currentMesh);
-                        currentMesh.geometry.dispose();
-                        currentMesh.material.dispose();
-                    }
-                    currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
-                    scene.add(currentMesh);
-                    depthMapTensor.dispose();
-                }
-            }
-        }, 100);
-    }
-
-    // Agregar event listeners para los controles
-    depthSlider.addEventListener('input', () => {
-        updateDepthValue();
-        regenerateModel();
-    });
-
-    baseSlider.addEventListener('input', () => {
-        updateBaseValue();
-        regenerateModel();
-    });
-
-    // Inicializar valores
-    updateDepthValue();
-    updateBaseValue();
-});
-
-    // Event listeners para los controles de ajuste
-    const depthSlider = document.getElementById('depth-scale');
-    const baseSlider = document.getElementById('base-height');
-    const depthValue = document.getElementById('depth-value');
-    const baseValue = document.getElementById('base-value');
-
-    function updateDepthValue() {
-        depthValue.textContent = `${depthSlider.value}%`;
-    }
-
-    function updateBaseValue() {
-        baseValue.textContent = `${baseSlider.value}%`;
-    }
-
-    function regenerateModel() {
-        if (currentMesh && imagePreview.src) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                imagePreview.src = e.target.result;
-                imagePreview.onload = async () => {
-                    const depthMapTensor = await estimateDepth(imagePreview);
-                    if (depthMapTensor) {
-                        if (currentMesh) {
-                            scene.remove(currentMesh);
-                            currentMesh.geometry.dispose();
-                            currentMesh.material.dispose();
-                        }
-                        currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
-                        
-                        if (document.getElementById('auto-center').checked) {
-                            const boundingBox = new THREE.Box3().setFromObject(currentMesh);
-                            const center = boundingBox.getCenter(new THREE.Vector3());
-                            const size = boundingBox.getSize(new THREE.Vector3());
-                            controls.target.copy(center);
-                            camera.position.z = Math.max(size.x, size.y, size.z) * 1.5;
-                            camera.lookAt(center);
-                        }
-                        
-                        scene.add(currentMesh);
-                        depthMapTensor.dispose();
-                    }
-                };
-            };
-            reader.readAsDataURL(uploadInput.files[0]);
-        }
-    }
-
-    depthSlider.addEventListener('input', () => {
-        updateDepthValue();
-        regenerateModel();
-    });
-
-    baseSlider.addEventListener('input', () => {
-        updateBaseValue();
-        regenerateModel();
-    });
-
-    // Inicializar valores
-    updateDepthValue();
-    updateBaseValue();
 });
