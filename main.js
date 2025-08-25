@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
 // --- Constants and Globals ---
-const MODEL_URL = 'https://github.com/isl-org/MiDaS/releases/download/v2_1/model_opt.tflite';
+const MODEL_URL = './assets/models/model_opt.tflite';
 let tfliteModel = null;
 let scene, camera, renderer, controls;
 let currentMesh = null;
