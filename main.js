@@ -3,9 +3,24 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
 // --- Constants and Globals ---
-const MODEL_URL = './assets/models/model_opt.tflite';
+const MODELS = {
+    default: './assets/models/model_opt.tflite',
+    fallback: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite'
+};
+let MODEL_URL = MODELS.default;
 let tfliteModel = null;
 let scene, camera, renderer, controls;
+
+// Función para verificar si un archivo existe
+async function checkFileExists(url) {
+    try {
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok;
+    } catch (e) {
+        console.warn('Error checking file:', e);
+        return false;
+    }
+}
 let currentMesh = null;
 
 // --- DOM Elements ---
@@ -53,30 +68,56 @@ function animate() {
 
 // --- AI & Core Logic ---
 async function loadModel() {
-    console.log('Iniciando carga del modelo TFLite desde:', MODEL_URL);
-    loadingIndicator.innerText = 'Cargando modelo de IA...';
+    console.log('Iniciando verificación de modelos disponibles...');
+    loadingIndicator.innerText = 'Inicializando sistema de IA...';
     loadingIndicator.style.display = 'block';
     
     try {
-        // Primero verificamos que podemos acceder al archivo
-        const modelResponse = await fetch(MODEL_URL);
-        if (!modelResponse.ok) {
-            throw new Error(`HTTP error! status: ${modelResponse.status}`);
-        }
-        console.log('Archivo del modelo accesible, iniciando carga...');
+        // Verificar si el modelo principal está disponible
+        const mainModelExists = await checkFileExists(MODELS.default);
+        console.log('Modelo principal disponible:', mainModelExists);
         
-        // Intentamos cargar el modelo
-        tfliteModel = await tflite.loadTFLiteModel(MODEL_URL);
-        console.log('Modelo cargado exitosamente:', tfliteModel);
-        loadingIndicator.innerText = 'Modelo listo. Puede comenzar a generar.';
+        if (!mainModelExists) {
+            console.log('Cambiando a modelo alternativo...');
+            MODEL_URL = MODELS.fallback;
+        }
+        
+        // Intentar cargar el modelo seleccionado
+        console.log('Iniciando carga del modelo desde:', MODEL_URL);
+        
+        // Intentar la carga con timeout
+        const modelLoadPromise = tflite.loadTFLiteModel(MODEL_URL);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout loading model')), 30000));
+        
+        tfliteModel = await Promise.race([modelLoadPromise, timeoutPromise]);
+        
+        if (tfliteModel) {
+            console.log('Modelo cargado exitosamente:', {
+                modelUrl: MODEL_URL,
+                modelType: MODEL_URL === MODELS.default ? 'Principal' : 'Alternativo'
+            });
+            loadingIndicator.innerText = 'Modelo listo. Puede comenzar a generar.';
+            return true;
+        }
     } catch (e) {
         console.error('Error detallado al cargar el modelo:', {
             message: e.message,
             stack: e.stack,
-            modelUrl: MODEL_URL
+            modelUrl: MODEL_URL,
+            browserInfo: navigator.userAgent
         });
-        alert(`Error al cargar el modelo: ${e.message}`);
+        
+        // Si falló con el modelo principal, intentar con el alternativo
+        if (MODEL_URL === MODELS.default) {
+            console.log('Intentando con modelo alternativo...');
+            MODEL_URL = MODELS.fallback;
+            return loadModel(); // Recursión para intentar con el modelo alternativo
+        }
+        
+        alert(`Error al cargar el modelo: ${e.message}. Por favor, verifique su conexión a internet.`);
         loadingIndicator.innerText = 'Error al cargar el modelo. Intente recargar la página.';
+        return false;
     }
 }
 
@@ -171,12 +212,25 @@ document.addEventListener('DOMContentLoaded', () => {
     initThree();
 
     // Verificar y cargar TFLite
+    let attempts = 0;
+    const maxAttempts = 50; // 5 segundos máximo
+
     function waitForTFLite() {
         if (typeof tflite !== 'undefined') {
             console.log('TFLite detectado, iniciando carga del modelo...');
-            loadModel();
+            loadModel().then(success => {
+                if (!success) {
+                    console.error('No se pudo cargar ningún modelo');
+                }
+            });
         } else {
-            console.log('Esperando que TFLite esté disponible...');
+            attempts++;
+            if (attempts >= maxAttempts) {
+                console.error('TFLite no se pudo cargar después de varios intentos');
+                alert('Error: No se pudo inicializar el sistema de IA. Por favor, recargue la página o intente con otro navegador.');
+                return;
+            }
+            console.log(`Esperando que TFLite esté disponible... (intento ${attempts}/${maxAttempts})`);
             setTimeout(waitForTFLite, 100);
         }
     }
