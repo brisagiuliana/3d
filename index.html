@@ -181,12 +181,67 @@
                 <label for="image-upload">Image File:</label>
                 <input type="file" id="image-upload" accept="image/jpeg, image/png">
             </div>
-            <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
-                <input type="checkbox" id="use-normal-map" name="use-normal-map" checked>
-                <label for="use-normal-map">Enable Advanced Textures (Normal Map)</label>
-                <p style="font-size: 0.8rem; color: #666;">Adds more realistic surface detail to the model. Requires slightly more processing time.</p>
+            <div style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                <div class="control-group">
+                    <label for="depth-scale">Profundidad:</label>
+                    <input type="range" id="depth-scale" min="10" max="200" value="100" step="10">
+                    <span id="depth-value">100%</span>
+                </div>
+                
+                <div class="control-group">
+                    <label for="base-height">Altura de la Base:</label>
+                    <input type="range" id="base-height" min="0" max="100" value="0" step="5">
+                    <span id="base-value">0%</span>
+                </div>
+
+                <div class="control-group">
+                    <input type="checkbox" id="auto-center" name="auto-center" checked>
+                    <label for="auto-center">Centrar Automáticamente</label>
+                </div>
+
+                <div class="control-group">
+                    <input type="checkbox" id="use-normal-map" name="use-normal-map" checked>
+                    <label for="use-normal-map">Texturas Avanzadas</label>
+                </div>
             </div>
         </div>
+
+        <style>
+            .control-group {
+                margin: 1rem 0;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+
+            input[type="range"] {
+                flex: 1;
+                height: 6px;
+                background: var(--secondary-color);
+                border-radius: 3px;
+                -webkit-appearance: none;
+            }
+
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 18px;
+                height: 18px;
+                background: var(--accent-color);
+                border-radius: 50%;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            input[type="range"]::-webkit-slider-thumb:hover {
+                transform: scale(1.1);
+                background: var(--primary-color);
+            }
+
+            .control-group span {
+                min-width: 3.5em;
+                color: var(--text-light);
+            }
+        </style>
 
         <div id="output-card">
             <h2>2. Generate & View</h2>

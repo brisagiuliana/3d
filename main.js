@@ -153,14 +153,38 @@ async function estimateDepth(imgElement) {
 async function createMeshFromDepthMap(depthMapTensor, textureImage) {
     const depthMap = await depthMapTensor.array();
     const [height, width] = depthMapTensor.shape;
-    const extrusionScale = 100.0;
+    
+    // Obtener valores de los controles
+    const depthScale = document.getElementById('depth-scale').value / 100;
+    const baseHeight = document.getElementById('base-height').value / 100;
+    const extrusionScale = 100.0 * depthScale;
+    
     const geometry = new THREE.PlaneGeometry(width, height, width - 1, height - 1);
     const positionAttribute = geometry.getAttribute('position');
+    
+    // Encontrar el rango de profundidades para normalización
+    let minDepth = 1.0;
+    let maxDepth = 0.0;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const depth = depthMap[y][x];
+            minDepth = Math.min(minDepth, depth);
+            maxDepth = Math.max(maxDepth, depth);
+        }
+    }
+    
+    // Aplicar la profundidad con base ajustable
     for (let i = 0; i < positionAttribute.count; i++) {
         const y = Math.floor(i / width);
         const depth = depthMap[y][i % width];
-        positionAttribute.setZ(i, (1.0 - depth) * extrusionScale);
+        
+        // Normalizar la profundidad y aplicar el recorte de base
+        const normalizedDepth = (depth - minDepth) / (maxDepth - minDepth);
+        const adjustedDepth = Math.max(normalizedDepth, baseHeight);
+        
+        positionAttribute.setZ(i, (1.0 - adjustedDepth) * extrusionScale);
     }
+    
     geometry.computeVertexNormals();
     const texture = new THREE.Texture(textureImage);
     texture.needsUpdate = true;
@@ -271,4 +295,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     downloadBtn.addEventListener('click', downloadGLB);
+
+    // Event listeners para los controles de ajuste
+    const depthSlider = document.getElementById('depth-scale');
+    const baseSlider = document.getElementById('base-height');
+    const depthValue = document.getElementById('depth-value');
+    const baseValue = document.getElementById('base-value');
+
+    function updateDepthValue() {
+        depthValue.textContent = `${depthSlider.value}%`;
+    }
+
+    function updateBaseValue() {
+        baseValue.textContent = `${baseSlider.value}%`;
+    }
+
+    function regenerateModel() {
+        if (currentMesh && imagePreview.src) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                imagePreview.onload = async () => {
+                    const depthMapTensor = await estimateDepth(imagePreview);
+                    if (depthMapTensor) {
+                        if (currentMesh) {
+                            scene.remove(currentMesh);
+                            currentMesh.geometry.dispose();
+                            currentMesh.material.dispose();
+                        }
+                        currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
+                        
+                        if (document.getElementById('auto-center').checked) {
+                            const boundingBox = new THREE.Box3().setFromObject(currentMesh);
+                            const center = boundingBox.getCenter(new THREE.Vector3());
+                            const size = boundingBox.getSize(new THREE.Vector3());
+                            controls.target.copy(center);
+                            camera.position.z = Math.max(size.x, size.y, size.z) * 1.5;
+                            camera.lookAt(center);
+                        }
+                        
+                        scene.add(currentMesh);
+                        depthMapTensor.dispose();
+                    }
+                };
+            };
+            reader.readAsDataURL(uploadInput.files[0]);
+        }
+    }
+
+    depthSlider.addEventListener('input', () => {
+        updateDepthValue();
+        regenerateModel();
+    });
+
+    baseSlider.addEventListener('input', () => {
+        updateBaseValue();
+        regenerateModel();
+    });
+
+    // Inicializar valores
+    updateDepthValue();
+    updateBaseValue();
 });
