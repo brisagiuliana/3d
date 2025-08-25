@@ -64,9 +64,28 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
-        #generate-btn:hover {
+        #generate-btn:hover, #download-btn:hover {
             background-color: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 86, 179, 0.4);
         }
+        
+        #download-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 1rem;
+        }
+        
+        #download-btn:hover {
+            background-color: #218838;
+        }
+
         #output-card {
             background: #fff;
             padding: 2rem;
@@ -109,7 +128,9 @@
         <div id="output-card">
             <h2>2. Generate & View</h2>
             <button id="generate-btn">Generate 3D Model</button>
-            <button id="download-btn" style="display:none; margin-left: 1rem;">Download GLB</button>
+            <button id="download-btn" style="display:none;">
+                <span>📥 Download 3D Model (GLB)</span>
+            </button>
             <div id="loading-indicator" style="display:none;">
                 <p>⚙️ Generating model, this may take a minute...</p>
             </div>
