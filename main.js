@@ -21,7 +21,7 @@ document.body.appendChild(imagePreview);
 // --- Three.js Setup ---
 function initThree() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xeeeeee);
+    scene.background = new THREE.Color(0x132F4C);
     const aspectRatio = canvas.clientWidth / canvas.clientHeight || 1;
     camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.1, 1000);
     camera.position.z = 500;

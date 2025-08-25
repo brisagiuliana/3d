@@ -22,12 +22,14 @@
 
     <style>
         :root {
-            --primary-color: #1a237e;
-            --secondary-color: #0d47a1;
+            --primary-color: #0A1929;
+            --secondary-color: #132F4C;
             --accent-color: #2196f3;
             --success-color: #28a745;
             --text-light: #ffffff;
-            --text-dark: #333333;
+            --text-dark: #E7EBF0;
+            --background-dark: #0A1929;
+            --card-bg: rgba(255, 255, 255, 0.05);
             --gradient-bg: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
         }
         
@@ -35,31 +37,35 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: var(--gradient-bg);
-            color: var(--text-dark);
+            background: var(--background-dark);
+            color: var(--text-light);
             min-height: 100vh;
         }
         header {
-            background-color: #fff;
-            padding: 1rem 2rem;
-            border-bottom: 1px solid #ddd;
+            background-color: rgba(19, 47, 76, 0.4);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(231, 235, 240, 0.1);
             text-align: center;
+            backdrop-filter: blur(10px);
         }
         header h1 {
             margin: 0;
-            font-size: 1.5rem;
-            color: #444;
+            font-size: 2rem;
+            color: var(--text-light);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
         }
         main {
             padding: 2rem;
-            max-width: 900px;
+            max-width: 1000px;
             margin: auto;
         }
         #controls-card {
-            background: #fff;
+            background: var(--card-bg);
             padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(231, 235, 240, 0.1);
             margin-bottom: 2rem;
         }
         #controls-card p {
@@ -105,22 +111,59 @@
         }
 
         #output-card {
-            background: #fff;
+            background: var(--card-bg);
             padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(231, 235, 240, 0.1);
             text-align: center;
         }
+        
         #loading-indicator {
             padding: 2rem;
             font-size: 1.2rem;
-            color: #555;
+            color: var(--text-light);
+            background: rgba(19, 47, 76, 0.4);
+            border-radius: 12px;
+            margin: 1rem 0;
         }
-        model-viewer {
-            width: 100%;
-            height: 500px;
+        
+        #renderer-canvas {
+            background-color: rgba(19, 47, 76, 0.2);
+            border-radius: 16px;
+            border: 1px solid rgba(231, 235, 240, 0.1);
+        }
+        
+        label {
+            color: var(--text-light);
+            font-weight: 500;
+        }
+        
+        h2 {
+            color: var(--text-light);
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--accent-color);
+            display: inline-block;
+            padding-bottom: 0.5rem;
+        }
+        
+        input[type="file"] {
+            background: rgba(19, 47, 76, 0.4);
+            padding: 1rem;
             border-radius: 8px;
-            background-color: #eee;
+            border: 2px dashed var(--accent-color);
+            width: 100%;
+            box-sizing: border-box;
+            margin: 1rem 0;
+            color: var(--text-light);
+            cursor: pointer;
+        }
+        
+        p {
+            color: var(--text-light);
+            opacity: 0.9;
         }
     </style>
 </head>
