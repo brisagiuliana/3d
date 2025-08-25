@@ -103,8 +103,19 @@ async function estimateDepth(imgElement) {
 }
 
 async function createMeshFromDepthMap(depthMapTensor, textureImage) {
-    const depthMap = await depthMapTensor.array();
-    const [height, width] = depthMapTensor.shape;
+    // --- DEBUGGING: Use a synthetic depth map (a ramp) instead of the AI output ---
+    const height = 256;
+    const width = 256;
+    const depthMap = [];
+    for (let y = 0; y < height; y++) {
+        const row = [];
+        for (let x = 0; x < width; x++) {
+            row.push(y / height); // Create a simple ramp from 0 to 1
+        }
+        depthMap.push(row);
+    }
+    // --- END DEBUGGING ---
+
     const extrusionScale = 100.0;
 
     const geometry = new THREE.PlaneGeometry(width, height, width - 1, height - 1);
@@ -164,7 +175,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMesh.geometry.dispose();
                         currentMesh.material.dispose();
                     }
+
                     currentMesh = await createMeshFromDepthMap(depthMapTensor, imagePreview);
+
                     // The geometry is already created with the correct aspect ratio (256x256).
                     // We don't need to scale it further.
                     // Let's center the camera and set a reasonable distance.
