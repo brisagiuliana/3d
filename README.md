@@ -2,6 +2,8 @@
 
 Una aplicación web que convierte imágenes 2D en modelos 3D interactivos utilizando inteligencia artificial.
 
+🌐 [Ver Demo en Vivo](https://brisagiuliana.github.io/3d/)
+
 ## Características
 
 - Conversión de imágenes 2D a modelos 3D
