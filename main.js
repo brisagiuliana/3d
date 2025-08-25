@@ -53,27 +53,44 @@ function animate() {
 
 // --- AI & Core Logic ---
 async function loadModel() {
-    console.log('Loading TFLite model...');
-    loadingIndicator.innerText = 'Loading AI Model...';
+    console.log('Iniciando carga del modelo TFLite desde:', MODEL_URL);
+    loadingIndicator.innerText = 'Cargando modelo de IA...';
     loadingIndicator.style.display = 'block';
+    
     try {
+        // Primero verificamos que podemos acceder al archivo
+        const modelResponse = await fetch(MODEL_URL);
+        if (!modelResponse.ok) {
+            throw new Error(`HTTP error! status: ${modelResponse.status}`);
+        }
+        console.log('Archivo del modelo accesible, iniciando carga...');
+        
+        // Intentamos cargar el modelo
         tfliteModel = await tflite.loadTFLiteModel(MODEL_URL);
-        console.log('Model loaded successfully.');
-        loadingIndicator.innerText = 'Model loaded. Ready to generate.';
+        console.log('Modelo cargado exitosamente:', tfliteModel);
+        loadingIndicator.innerText = 'Modelo listo. Puede comenzar a generar.';
     } catch (e) {
-        console.error('Failed to load model:', e);
-        alert('Failed to load the AI model. Please check the console for details.');
-        loadingIndicator.innerText = 'Model failed to load.';
+        console.error('Error detallado al cargar el modelo:', {
+            message: e.message,
+            stack: e.stack,
+            modelUrl: MODEL_URL
+        });
+        alert(`Error al cargar el modelo: ${e.message}`);
+        loadingIndicator.innerText = 'Error al cargar el modelo. Intente recargar la página.';
     }
 }
 
 async function estimateDepth(imgElement) {
     if (!tfliteModel) {
-        alert('Model is not loaded yet.');
+        console.error('Intento de usar el modelo antes de que esté cargado');
+        alert('El modelo aún no está cargado. Por favor, espere a que se complete la carga.');
         return null;
     }
-    console.log('Estimating depth with TFLite model...');
-    loadingIndicator.innerText = 'Estimating depth...';
+    console.log('Iniciando estimación de profundidad...', {
+        modelStatus: tfliteModel ? 'Cargado' : 'No cargado',
+        imageSize: `${imgElement.width}x${imgElement.height}`
+    });
+    loadingIndicator.innerText = 'Calculando profundidad de la imagen...';
     loadingIndicator.style.display = 'block';
 
     const tensor = tf.tidy(() => {
@@ -138,12 +155,28 @@ function downloadGLB() {
 
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Verificar requisitos del navegador
+    if (!window.WebGLRenderingContext) {
+        alert('Tu navegador no soporta WebGL, necesario para la visualización 3D.');
+        return;
+    }
+
+    if (typeof tf === 'undefined') {
+        console.error('TensorFlow.js no se ha cargado correctamente');
+        alert('Error: No se pudo cargar la biblioteca de IA. Por favor, recarga la página.');
+        return;
+    }
+
+    // Inicializar Three.js
     initThree();
+
+    // Verificar y cargar TFLite
     function waitForTFLite() {
         if (typeof tflite !== 'undefined') {
+            console.log('TFLite detectado, iniciando carga del modelo...');
             loadModel();
         } else {
-            console.log('TFLite library not ready, waiting...');
+            console.log('Esperando que TFLite esté disponible...');
             setTimeout(waitForTFLite, 100);
         }
     }
